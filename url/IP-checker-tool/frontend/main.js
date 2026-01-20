@@ -151,9 +151,10 @@ startBtn.addEventListener('click', async () => {
     errorUrls = [];
 
     const batchSize = 50;
-    for (let i = 0; i < urls.length; i += batchSize) {
-        const batch = urls.slice(i, i + batchSize);
+    const maxParallelBatches = 5; // Allow 5 batches to be processed in parallel
+    let processedCount = 0;
 
+    const processBatch = async (batch) => {
         try {
             const response = await fetch('http://localhost:3001/check-urls', {
                 method: 'POST',
@@ -173,16 +174,33 @@ startBtn.addEventListener('click', async () => {
                 }
             });
 
-            const processed = Math.min(i + batchSize, urls.length);
-            const percent = (processed / urls.length) * 100;
+            processedCount += batch.length;
+            const percent = (processedCount / urls.length) * 100;
             progressBar.style.width = `${percent}%`;
-            statusText.textContent = `${translations[currentLang].checkingStatus} (${processed}/${urls.length})`;
+            statusText.textContent = `${translations[currentLang].checkingStatus} (${processedCount}/${urls.length})`;
 
         } catch (error) {
             console.error('Batch error:', error);
             statusText.textContent = `Error: ${error.message}`;
         }
+    };
+
+    // Use a simple pool for parallel batches
+    const batches = [];
+    for (let i = 0; i < urls.length; i += batchSize) {
+        batches.push(urls.slice(i, i + batchSize));
     }
+
+    const pool = [];
+    for (const batch of batches) {
+        const promise = processBatch(batch);
+        pool.push(promise);
+        if (pool.length >= maxParallelBatches) {
+            await Promise.all(pool);
+            pool.length = 0;
+        }
+    }
+    await Promise.all(pool);
 
     showResults();
 });

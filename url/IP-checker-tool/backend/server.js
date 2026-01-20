@@ -150,7 +150,7 @@ app.post('/check-urls', async (req, res) => {
 
     const results = await limitConcurrency(
         urls.map((url) => () => (mode === 'ip' ? checkIp(url) : checkUrl(url))),
-        10
+        30
     );
 
     res.json({ results });
